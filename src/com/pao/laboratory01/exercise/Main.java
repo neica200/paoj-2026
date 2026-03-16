@@ -28,6 +28,7 @@ public class Main {
             System.out.print("Alege opțiunea: ");
 
             int option = scanner.nextInt();
+            scanner.nextLine();
 
             switch (option) {
                 case 1:
@@ -44,9 +45,15 @@ public class Main {
                     // TODO: Implementează adăugare review
                     // Pași:
                     // 1. Citește numele mașinii de la tastatură (scanner.next())
+                    System.out.print("Introdu numele mașinii: ");
+                    name = scanner.next();
+                    scanner.nextLine();
                     // 2. Citește textul review-ului (scanner.next())
+                    System.out.print("Introdu textul reviewului: ");
+                    String text = scanner.nextLine();
                     // 3. Apelează carService.addReview(carName, review)
-                    System.out.println("TODO — implementează adăugare review");
+                    carService.addReview(name,text);
+
                     break;
                 case 0:
                     System.out.println("La revedere!");
