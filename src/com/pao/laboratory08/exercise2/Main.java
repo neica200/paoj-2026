@@ -57,7 +57,7 @@ public class Main {
     }
 
     private static void scrieFisier(List<Student> studenti) {
-        try (BufferedWriter bw = new BufferedWriter(new FileWriter("rezultate.txt"))) {
+        try (BufferedWriter bw = new BufferedWriter(new FileWriter("src/com/pao/laboratory08/exercise2/rezultate.txt"))) {
 
             for (Student s : studenti) {
                 bw.write(s.toString());
