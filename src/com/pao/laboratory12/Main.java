@@ -1,0 +1,116 @@
+package com.pao.laboratory12;
+
+import com.pao.laboratory12.util.*;
+import com.pao.laboratory12.model.*;
+import com.pao.laboratory12.repository.*;
+import com.pao.laboratory12.service.AuditService;
+import com.pao.laboratory12.service.LibraryService;
+
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
+import java.sql.Connection;
+import java.sql.Statement;
+import java.util.List;
+
+public class Main {
+    public static void main(String[] args) throws Exception {
+        System.out.println("=== BIBLIOTECA JDBC — Demo Lab12 ===\n");
+
+        // 1. Obținem conexiunea din Singleton
+        Connection conn = DatabaseConnection.getInstance().getConnection();
+
+        // 2. Inițializăm automat structura bazei de date (executăm schema.sql)
+        try (InputStream is = Main.class.getClassLoader()
+                .getResourceAsStream("com/pao/laboratory12/resources/schema.sql")) {
+
+            if (is == null) {
+                System.err.println("❌ Nu s-a putut găsi fișierul schema.sql în resurse!");
+            } else {
+                String sqlScript = new String(is.readAllBytes(), StandardCharsets.UTF_8);
+                // Împărțim scriptul în comenzi individuale prin separatorul ";"
+                String[] commands = sqlScript.split(";");
+
+                try (Statement stmt = conn.createStatement()) {
+                    for (String command : commands) {
+                        if (!command.trim().isEmpty()) {
+                            stmt.execute(command.trim());
+                        }
+                    }
+                    System.out.println("✅ Tabelele (author, book, reader, loan) au fost resetate și create în SQLite!\n");
+                }
+            }
+        }
+
+        // 3. Inițializăm serviciile și repository-urile
+        AuditService audit = AuditService.getInstance();
+        AuthorRepository authorRepo = new AuthorRepository();
+        BookRepository bookRepo     = new BookRepository();
+        ReaderRepository readerRepo = new ReaderRepository();
+        LoanRepository loanRepo     = new LoanRepository();
+        LibraryService libraryService = LibraryService.getInstance();
+
+        // ---- Actiunea 1: Adauga autor ----
+        Author author = new Author("Gabriel Garcia Marquez", "CO");
+        authorRepo.save(author);
+        audit.log("add_author");
+        System.out.println("1. Autor adaugat: " + author);
+
+        // ---- Actiunea 2: Adauga carte ----
+        Book book1 = new Book("100 de ani de singuratate", author.getId());
+        Book book2 = new Book("Dragostea in vremea holerei", author.getId());
+        bookRepo.save(book1);
+        bookRepo.save(book2);
+        audit.log("add_book");
+        System.out.println("2. Carti adaugate: " + book1 + ", " + book2);
+
+        // ---- Actiunea 3: Adauga cititor ----
+        Reader reader = new Reader("Ion Popescu", "ion.popescu@email.com");
+        readerRepo.save(reader);
+        audit.log("add_reader");
+        System.out.println("3. Cititor adaugat: " + reader);
+
+        // ---- Actiunea 4: Listeaza toate cartile ----
+        List<Book> allBooks = bookRepo.findAll();
+        audit.log("list_books");
+        System.out.println("4. Toate cartile (" + allBooks.size() + "):");
+        allBooks.forEach(b -> System.out.println("   " + b));
+
+        // ---- Actiunea 5: Cauta carte dupa id ----
+        bookRepo.findById(book1.getId()).ifPresentOrElse(
+                b -> System.out.println("5. Carte gasita: " + b),
+                () -> System.out.println("5. Carte negasita.")
+        );
+        audit.log("find_book_by_id");
+
+        // ---- Actiunea 6: Actualizeaza carte ----
+        book1.setTitle("100 de ani de singuratate (Ed. speciala)");
+        bookRepo.update(book1);
+        audit.log("update_book");
+        System.out.println("6. Carte actualizata: " + book1);
+
+        // ---- Actiunea 7: Imprumuta carte (TRANZACTIE) ----
+        long loanId = libraryService.borrowBook(reader.getId(), book1.getId());
+        audit.log("borrow_book");
+        System.out.println("7. Imprumut creat cu ID=" + loanId);
+
+        // ---- Actiunea 8: Returneaza carte (TRANZACTIE) ----
+        libraryService.returnBook(loanId);
+        audit.log("return_book");
+        System.out.println("8. Carte returnata.");
+
+        // ---- Actiunea 9: Raport imprumuturi active cu JOIN ----
+        List<String> activeLoans = libraryService.getActiveLoansWithDetails();
+        audit.log("report_active_loans");
+        System.out.println("9. Imprumuturi active: " + (activeLoans.isEmpty() ? "niciun" : ""));
+        activeLoans.forEach(s -> System.out.println("   " + s));
+
+        // ---- Actiunea 10: Sterge cititor ----
+        loanRepo.delete(loanId);
+        readerRepo.delete(reader.getId());
+        audit.log("delete_reader");
+        System.out.println("10. Cititor sters cu ID=" + reader.getId());
+
+        System.out.println("\n=== Demo finalizat. Verifica audit.csv ===");
+        DatabaseConnection.getInstance().close();  // inchidem conexiunea
+    }
+}
